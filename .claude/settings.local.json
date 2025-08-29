@@ -5,7 +5,10 @@
       "Bash(npm init:*)",
       "Bash(npm install:*)",
       "Bash(npx create-react-app:*)",
-      "Bash(npx tailwindcss init:*)"
+      "Bash(npx tailwindcss init:*)",
+      "Bash(npm uninstall:*)",
+      "Bash(npx tailwindcss:*)",
+      "Bash(node:*)"
     ],
     "deny": [],
     "ask": []

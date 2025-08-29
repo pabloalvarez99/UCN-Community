@@ -1,278 +1,376 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
-const carreras = [
-  'Ingeniería Civil',
-  'Ingeniería Industrial',
-  'Ingeniería en Sistemas',
-  'Ingeniería Comercial',
-  'Arquitectura',
+// Carreras oficiales UCN Campus Coquimbo
+const CARRERAS_UCN_COQUIMBO = [
+  'Biología Marina',
+  'Ingeniería en Acuicultura', 
+  'Ingeniería en Prevención de Riesgos y Medioambiente',
   'Medicina',
   'Enfermería',
+  'Nutrición y Dietética',
   'Kinesiología',
-  'Fonoaudiología',
+  'Ingeniería Civil Industrial',
+  'Ingeniería Civil en Computación e Informática',
+  'Tecnologías de Información',
+  'Ingeniería Comercial',
+  'Contador Auditor Diurno',
+  'Contador Auditor Vespertino', 
+  'Ingeniería en Información y Control de Gestión',
   'Derecho',
-  'Psicología',
-  'Trabajo Social',
-  'Administración Pública',
-  'Contador Público',
   'Periodismo',
-  'Publicidad',
-  'Diseño Gráfico'
-];
-
-const campus = [
-  'Antofagasta',
-  'Coquimbo',
-  'Santiago'
+  'Psicología',
+  'Pedagogía en Filosofía y Religión'
 ];
 
 const userSchema = new mongoose.Schema({
-  name: {
+  // CAMPOS OBLIGATORIOS
+  rut: {
     type: String,
-    required: [true, 'Por favor ingresa tu nombre completo'],
+    required: [true, 'RUT es obligatorio'],
+    unique: true,
+    uppercase: true,
     trim: true,
-    minlength: [2, 'El nombre debe tener al menos 2 caracteres'],
-    maxlength: [100, 'El nombre no puede ser mayor a 100 caracteres'],
-    match: [/^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/, 'El nombre solo puede contener letras y espacios']
+    validate: {
+      validator: function(rut) {
+        // Validación básica del formato RUT (sin puntos ni guión)
+        return /^\d{7,8}[0-9K]$/.test(rut);
+      },
+      message: 'Formato de RUT inválido'
+    }
   },
+
   email: {
     type: String,
-    required: [true, 'Por favor ingresa tu email institucional'],
+    required: [true, 'Email institucional es obligatorio'],
     unique: true,
     lowercase: true,
     trim: true,
-    match: [
-      /^[a-zA-Z0-9._%+-]+@(alumnos\.ucn\.cl|ucn\.cl)$/,
-      'Debe usar un email institucional UCN (@alumnos.ucn.cl o @ucn.cl)'
-    ]
+    validate: {
+      validator: function(email) {
+        return /^[a-zA-Z0-9._%+-]+@(alumnos\.ucn\.cl|ucn\.cl)$/.test(email);
+      },
+      message: 'Debe usar un email institucional UCN (@alumnos.ucn.cl o @ucn.cl)'
+    }
   },
+
+  nombre: {
+    type: String,
+    required: [true, 'Nombre es obligatorio'],
+    trim: true,
+    minlength: [2, 'El nombre debe tener al menos 2 caracteres'],
+    maxlength: [50, 'El nombre no puede exceder 50 caracteres'],
+    validate: {
+      validator: function(nombre) {
+        return /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(nombre);
+      },
+      message: 'El nombre solo puede contener letras y espacios'
+    }
+  },
+
+  apellidos: {
+    type: String,
+    required: [true, 'Apellidos son obligatorios'],
+    trim: true,
+    minlength: [2, 'Los apellidos deben tener al menos 2 caracteres'],
+    maxlength: [50, 'Los apellidos no pueden exceder 50 caracteres'],
+    validate: {
+      validator: function(apellidos) {
+        return /^[a-zA-ZáéíóúÁÉÍÓÚñÑ\s]+$/.test(apellidos);
+      },
+      message: 'Los apellidos solo pueden contener letras y espacios'
+    }
+  },
+
+  // Campo virtual para nombre completo
+  name: {
+    type: String,
+    default: function() {
+      return `${this.nombre} ${this.apellidos}`;
+    }
+  },
+
   password: {
     type: String,
-    required: [true, 'Por favor ingresa una contraseña'],
-    minlength: [8, 'La contraseña debe tener al menos 8 caracteres'],
-    select: false,
-    validate: {
-      validator: function(password) {
-        return /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/.test(password);
-      },
-      message: 'La contraseña debe contener al menos una minúscula, una mayúscula, un número y un carácter especial'
-    }
+    required: [true, 'Contraseña es obligatoria'],
+    minlength: [6, 'La contraseña debe tener al menos 6 caracteres'],
+    select: false // No incluir en consultas por defecto
   },
+
   carrera: {
     type: String,
-    required: [true, 'Por favor selecciona tu carrera'],
+    required: [true, 'Carrera es obligatoria'],
     enum: {
-      values: carreras,
-      message: 'Carrera no válida'
+      values: CARRERAS_UCN_COQUIMBO,
+      message: 'Carrera no válida para UCN Campus Coquimbo'
     }
   },
+
+  // CAMPOS OPCIONALES
   año_ingreso: {
     type: Number,
-    required: [true, 'Por favor ingresa tu año de ingreso'],
-    min: [2010, 'El año de ingreso no puede ser anterior a 2010'],
-    max: [new Date().getFullYear(), 'El año de ingreso no puede ser futuro'],
-    validate: {
-      validator: function(año) {
-        return Number.isInteger(año);
-      },
-      message: 'El año de ingreso debe ser un número entero'
+    min: [2018, 'Año de ingreso no puede ser anterior a 2018'],
+    max: [2025, 'Año de ingreso no puede ser posterior a 2025'],
+    default: function() {
+      return new Date().getFullYear();
     }
   },
-  campus: {
+
+  alianza: {
     type: String,
-    required: [true, 'Por favor selecciona tu campus'],
     enum: {
-      values: campus,
-      message: 'Campus no válido'
-    }
+      values: ['Blanca', 'Azul'],
+      message: 'Alianza debe ser Blanca o Azul'
+    },
+    default: null
   },
+
   biografia: {
     type: String,
     maxlength: [500, 'La biografía no puede exceder 500 caracteres'],
     trim: true,
     default: ''
   },
+
   foto_perfil: {
     type: String,
-    default: function() {
-      const avatars = [
-        'https://ui-avatars.com/api/?name=' + encodeURIComponent(this.name) + '&background=4f46e5&color=ffffff&size=200',
-        'https://ui-avatars.com/api/?name=' + encodeURIComponent(this.name) + '&background=059669&color=ffffff&size=200',
-        'https://ui-avatars.com/api/?name=' + encodeURIComponent(this.name) + '&background=dc2626&color=ffffff&size=200',
-        'https://ui-avatars.com/api/?name=' + encodeURIComponent(this.name) + '&background=7c3aed&color=ffffff&size=200'
-      ];
-      return avatars[Math.floor(Math.random() * avatars.length)];
-    },
+    default: null,
     validate: {
       validator: function(url) {
         return !url || /^https?:\/\/.+\.(jpg|jpeg|png|gif|webp)$/i.test(url) || url.includes('ui-avatars.com');
       },
-      message: 'La URL de la foto debe ser válida y apuntar a una imagen'
+      message: 'URL de foto de perfil inválida'
     }
   },
+
+  verificado: {
+    type: Boolean,
+    default: false
+  },
+
+  activo: {
+    type: Boolean,
+    default: true
+  },
+
+  // CAMPOS DE SISTEMA
+  role: {
+    type: String,
+    enum: ['student', 'professor', 'admin'],
+    default: function() {
+      return this.email && this.email.endsWith('@ucn.cl') ? 'professor' : 'student';
+    }
+  },
+
+  campus: {
+    type: String,
+    default: 'Coquimbo',
+    enum: ['Coquimbo']
+  },
+
+  facultad: {
+    type: String,
+    default: function() {
+      const facultades = {
+        'Biología Marina': 'Facultad de Ciencias del Mar',
+        'Ingeniería en Acuicultura': 'Facultad de Ciencias del Mar',
+        'Ingeniería en Prevención de Riesgos y Medioambiente': 'Facultad de Ingeniería y Ciencias Geológicas',
+        'Medicina': 'Facultad de Medicina',
+        'Enfermería': 'Facultad de Medicina',
+        'Nutrición y Dietética': 'Facultad de Medicina',
+        'Kinesiología': 'Facultad de Medicina',
+        'Ingeniería Civil Industrial': 'Facultad de Ingeniería y Ciencias Geológicas',
+        'Ingeniería Civil en Computación e Informática': 'Facultad de Ingeniería y Ciencias Geológicas',
+        'Tecnologías de Información': 'Facultad de Ingeniería y Ciencias Geológicas',
+        'Ingeniería Comercial': 'Facultad de Economía y Administración',
+        'Contador Auditor Diurno': 'Facultad de Economía y Administración',
+        'Contador Auditor Vespertino': 'Facultad de Economía y Administración',
+        'Ingeniería en Información y Control de Gestión': 'Facultad de Economía y Administración',
+        'Derecho': 'Facultad de Derecho',
+        'Periodismo': 'Facultad de Humanidades',
+        'Psicología': 'Facultad de Humanidades',
+        'Pedagogía en Filosofía y Religión': 'Facultad de Educación'
+      };
+      return facultades[this.carrera] || 'No determinada';
+    }
+  },
+
+  // CAMPOS DE VERIFICACIÓN
+  emailVerificationCode: {
+    type: String,
+    select: false
+  },
+
+  emailVerificationExpires: {
+    type: Date,
+    select: false
+  },
+
+  fecha_verificacion: {
+    type: Date,
+    default: null
+  },
+
+  // CAMPOS DE SEGURIDAD
+  loginAttempts: {
+    failed: {
+      type: Number,
+      default: 0
+    },
+    lastAttempt: {
+      type: Date,
+      default: null
+    },
+    lockedUntil: {
+      type: Date,
+      default: null
+    }
+  },
+
+  accountStatus: {
+    type: String,
+    enum: ['pending_verification', 'active', 'suspended', 'locked'],
+    default: 'pending_verification'
+  },
+
+  last_login: {
+    type: Date,
+    default: null
+  },
+
   fecha_registro: {
     type: Date,
     default: Date.now,
     immutable: true
   },
-  verificado: {
-    type: Boolean,
-    default: false
-  },
-  verification_token: {
-    type: String,
-    select: false
-  },
-  verification_token_expires: {
-    type: Date,
-    select: false
-  },
-  reset_password_token: {
-    type: String,
-    select: false
-  },
-  reset_password_expires: {
-    type: Date,
-    select: false
-  },
-  last_login: {
-    type: Date
-  },
-  login_attempts: {
-    type: Number,
-    default: 0
-  },
-  account_locked: {
-    type: Boolean,
-    default: false
-  },
-  lock_until: {
-    type: Date
-  },
-  isActive: {
-    type: Boolean,
-    default: true
-  },
-  role: {
-    type: String,
-    enum: ['student', 'professor', 'admin'],
-    default: function() {
-      return this.email.includes('@ucn.cl') ? 'professor' : 'student';
+
+  // CONFIGURACIONES USUARIO
+  configuracion: {
+    notificaciones: {
+      email: {
+        type: Boolean,
+        default: true
+      },
+      push: {
+        type: Boolean,
+        default: true
+      },
+      mensajes: {
+        type: Boolean,
+        default: true
+      },
+      publicaciones: {
+        type: Boolean,
+        default: true
+      }
+    },
+    privacidad: {
+      perfil_publico: {
+        type: Boolean,
+        default: true
+      },
+      mostrar_email: {
+        type: Boolean,
+        default: false
+      },
+      mostrar_telefono: {
+        type: Boolean,
+        default: false
+      }
     }
   },
-  privacy_settings: {
-    show_email: {
-      type: Boolean,
-      default: false
+
+  // CAMPOS ADICIONALES
+  telefono: {
+    type: String,
+    validate: {
+      validator: function(tel) {
+        return !tel || /^\+?56?[0-9]{8,9}$/.test(tel.replace(/\s/g, ''));
+      },
+      message: 'Formato de teléfono inválido'
     },
-    show_career: {
-      type: Boolean,
-      default: true
-    },
-    show_campus: {
-      type: Boolean,
-      default: true
-    },
-    allow_messages: {
-      type: Boolean,
-      default: true
-    }
+    default: null
   }
+
 }, {
   timestamps: true,
   toJSON: {
+    virtuals: true,
     transform: function(doc, ret) {
-      delete ret.password;
-      delete ret.verification_token;
-      delete ret.verification_token_expires;
-      delete ret.reset_password_token;
-      delete ret.reset_password_expires;
+      ret.id = ret._id;
+      delete ret._id;
       delete ret.__v;
+      delete ret.password;
+      delete ret.emailVerificationCode;
+      delete ret.emailVerificationExpires;
       return ret;
     }
+  },
+  toObject: {
+    virtuals: true
   }
 });
 
-userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) {
-    return next();
-  }
-  
-  const saltRounds = parseInt(process.env.BCRYPT_ROUNDS) || 12;
-  const salt = await bcrypt.genSalt(saltRounds);
-  this.password = await bcrypt.hash(this.password, salt);
-  next();
+// Virtual para nombre completo
+userSchema.virtual('nombreCompleto').get(function() {
+  return `${this.nombre} ${this.apellidos}`;
 });
 
-userSchema.methods.matchPassword = async function(enteredPassword) {
-  return await bcrypt.compare(enteredPassword, this.password);
-};
-
-userSchema.methods.isAccountLocked = function() {
-  return !!(this.account_locked && this.lock_until && this.lock_until > Date.now());
-};
-
-userSchema.methods.incLoginAttempts = function() {
-  if (this.lock_until && this.lock_until < Date.now()) {
-    return this.updateOne({
-      $unset: {
-        login_attempts: 1,
-        lock_until: 1,
-        account_locked: 1
-      }
-    });
-  }
-  
-  const updates = { $inc: { login_attempts: 1 } };
-  
-  if (this.login_attempts + 1 >= 5 && !this.account_locked) {
-    updates.$set = {
-      account_locked: true,
-      lock_until: Date.now() + 2 * 60 * 60 * 1000 // 2 horas
-    };
-  }
-  
-  return this.updateOne(updates);
-};
-
-userSchema.methods.resetLoginAttempts = function() {
-  return this.updateOne({
-    $unset: {
-      login_attempts: 1,
-      lock_until: 1,
-      account_locked: 1
-    }
-  });
-};
-
-userSchema.virtual('año_actual').get(function() {
+// Virtual para año académico actual
+userSchema.virtual('añoAcademico').get(function() {
   const currentYear = new Date().getFullYear();
   const yearsStudied = currentYear - this.año_ingreso;
   return Math.max(1, Math.min(yearsStudied + 1, 6));
 });
 
-userSchema.virtual('tiempo_registro').get(function() {
-  const now = new Date();
-  const registered = new Date(this.fecha_registro);
-  const diffTime = Math.abs(now - registered);
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-  
-  if (diffDays < 30) {
-    return `${diffDays} día${diffDays !== 1 ? 's' : ''}`;
-  } else if (diffDays < 365) {
-    const months = Math.floor(diffDays / 30);
-    return `${months} mes${months !== 1 ? 'es' : ''}`;
-  } else {
-    const years = Math.floor(diffDays / 365);
-    return `${years} año${years !== 1 ? 's' : ''}`;
+// Índices
+userSchema.index({ email: 1 }, { unique: true });
+userSchema.index({ rut: 1 }, { unique: true });
+userSchema.index({ carrera: 1, año_ingreso: 1 });
+userSchema.index({ verificado: 1, activo: 1 });
+userSchema.index({ accountStatus: 1 });
+
+// Middleware pre-save para actualizar nombre completo
+userSchema.pre('save', function(next) {
+  if (this.nombre && this.apellidos) {
+    this.name = `${this.nombre} ${this.apellidos}`;
   }
+  next();
 });
 
-userSchema.index({ email: 1 }, { unique: true });
-userSchema.index({ carrera: 1, campus: 1 });
-userSchema.index({ año_ingreso: 1 });
-userSchema.index({ verificado: 1, isActive: 1 });
-userSchema.index({ 'privacy_settings.allow_messages': 1 });
+// Métodos del esquema
+userSchema.methods.matchPassword = async function(enteredPassword) {
+  return await bcrypt.compare(enteredPassword, this.password);
+};
+
+userSchema.methods.isAccountLocked = function() {
+  return this.accountStatus === 'locked' && 
+         this.loginAttempts.lockedUntil && 
+         this.loginAttempts.lockedUntil > new Date();
+};
+
+userSchema.methods.incrementLoginAttempts = async function() {
+  this.loginAttempts.failed += 1;
+  this.loginAttempts.lastAttempt = new Date();
+
+  if (this.loginAttempts.failed >= 5) {
+    this.accountStatus = 'locked';
+    this.loginAttempts.lockedUntil = new Date(Date.now() + 2 * 60 * 60 * 1000); // 2 horas
+  }
+
+  return await this.save();
+};
+
+userSchema.methods.resetLoginAttempts = async function() {
+  this.loginAttempts.failed = 0;
+  this.loginAttempts.lastAttempt = null;
+  this.loginAttempts.lockedUntil = null;
+  
+  if (this.accountStatus === 'locked') {
+    this.accountStatus = this.verificado ? 'active' : 'pending_verification';
+  }
+
+  return await this.save();
+};
 
 module.exports = mongoose.model('User', userSchema);

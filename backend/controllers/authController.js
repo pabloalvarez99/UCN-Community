@@ -1,494 +1,570 @@
-const User = require('../models/User');
-const { generateTokens } = require('../utils/helpers');
-const { createResponse, logAction } = require('../utils/helpers');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
+const User = require('../models/User');
+const { validateRutFormat } = require('../middleware/validateRUT');
 
+/**
+ * Generar tokens JWT
+ * @param {string} userId - ID del usuario
+ * @returns {object} - { accessToken, refreshToken, tokenExpiry }
+ */
+const generateTokens = (userId) => {
+  const payload = { id: userId };
+  
+  const accessToken = jwt.sign(
+    payload,
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRES_IN || '15m' }
+  );
+  
+  const refreshToken = jwt.sign(
+    payload,
+    process.env.JWT_REFRESH_SECRET,
+    { expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '7d' }
+  );
+
+  // Calcular fecha de expiración
+  const tokenExpiry = new Date();
+  tokenExpiry.setMinutes(tokenExpiry.getMinutes() + 15); // 15 minutos por defecto
+
+  return {
+    accessToken,
+    refreshToken,
+    tokenExpiry: tokenExpiry.toISOString()
+  };
+};
+
+/**
+ * Generar código de verificación de email
+ * @returns {string} - Código de 6 dígitos
+ */
+const generateVerificationCode = () => {
+  return Math.floor(100000 + Math.random() * 900000).toString();
+};
+
+/**
+ * Registrar nuevo usuario
+ * @route POST /api/auth/register
+ */
 const register = async (req, res) => {
   try {
-    const { name, email, password, carrera, año_ingreso, campus, biografia } = req.body;
-    
-    // Usar email validado del middleware
-    const validatedEmail = req.validatedEmail?.email || email.toLowerCase().trim();
-    const userType = req.validatedEmail?.userType || 'student';
-
-    // Verificar si el usuario ya existe
-    const existingUser = await User.findOne({ 
-      email: validatedEmail 
-    }).select('email isActive account_locked');
-
-    if (existingUser) {
-      // Si el usuario existe pero está inactivo, permitir reactivación
-      if (!existingUser.isActive) {
-        logAction('REGISTER_ATTEMPT_INACTIVE_USER', validatedEmail, `Intento de registro con cuenta inactiva`);
-        return res.status(409).json(createResponse(
-          false,
-          'Esta cuenta existe pero está desactivada. Contacta al administrador para reactivarla',
-          null,
-          { accountStatus: 'inactive', canReactivate: true }
-        ));
-      }
-
-      // Si el usuario existe y está bloqueado
-      if (existingUser.account_locked) {
-        logAction('REGISTER_ATTEMPT_LOCKED_USER', validatedEmail, `Intento de registro con cuenta bloqueada`);
-        return res.status(423).json(createResponse(
-          false,
-          'Esta cuenta está temporalmente bloqueada. Intenta más tarde o contacta al administrador',
-          null,
-          { accountStatus: 'locked' }
-        ));
-      }
-
-      logAction('REGISTER_ATTEMPT_EXISTING_USER', validatedEmail, `Intento de registro con email existente`);
-      return res.status(409).json(createResponse(
-        false,
-        'Ya existe una cuenta con este email institucional',
-        null,
-        { 
-          accountExists: true,
-          loginUrl: '/api/auth/login',
-          forgotPasswordUrl: '/api/auth/forgot-password'
-        }
-      ));
-    }
-
-    // Validaciones adicionales de seguridad
-    if (password.length < 8) {
-      return res.status(400).json(createResponse(
-        false,
-        'La contraseña debe tener al menos 8 caracteres'
-      ));
-    }
-
-    // Verificar complejidad de contraseña
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]/;
-    if (!passwordRegex.test(password)) {
-      return res.status(400).json(createResponse(
-        false,
-        'La contraseña debe contener al menos: 1 minúscula, 1 mayúscula, 1 número y 1 carácter especial'
-      ));
-    }
-
-    // Verificar que la contraseña no contenga el nombre o email
-    const nameLower = name.toLowerCase();
-    const emailLocal = validatedEmail.split('@')[0].toLowerCase();
-    const passwordLower = password.toLowerCase();
-    
-    if (passwordLower.includes(nameLower) || passwordLower.includes(emailLocal)) {
-      return res.status(400).json(createResponse(
-        false,
-        'La contraseña no puede contener tu nombre o parte de tu email'
-      ));
-    }
-
-    // Crear usuario con rol basado en dominio
-    const role = userType === 'faculty' ? 'professor' : 'student';
-    
-    const userData = {
-      name: name.trim(),
-      email: validatedEmail,
-      password,
+    const {
+      rut,
+      rutLimpio,
+      rutFormateado,
+      email,
+      nombre,
+      apellidos,
       carrera,
-      año_ingreso: parseInt(año_ingreso),
-      campus,
-      biografia: biografia?.trim() || '',
-      role,
-      verificado: false, // Requerirá verificación por email
-      verification_token: crypto.randomBytes(32).toString('hex'),
-      verification_token_expires: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 horas
-      last_login: null,
-      login_attempts: 0,
-      account_locked: false
-    };
+      carreraValida,
+      facultad,
+      password,
+      año_ingreso,
+      alianza,
+      telefono,
+      biografia
+    } = req.body;
 
-    const user = await User.create(userData);
+    // Validaciones adicionales
+    if (!nombre || !apellidos) {
+      return res.status(400).json({
+        success: false,
+        message: 'Nombre y apellidos son obligatorios',
+        errors: [
+          { field: 'nombre', message: 'Nombre requerido' },
+          { field: 'apellidos', message: 'Apellidos requeridos' }
+        ]
+      });
+    }
+
+    if (!password || password.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'La contraseña debe tener al menos 6 caracteres',
+        errors: [{ field: 'password', message: 'Contraseña debe tener al menos 6 caracteres' }]
+      });
+    }
+
+    // Validar año de ingreso
+    if (año_ingreso && (año_ingreso < 2018 || año_ingreso > 2025)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Año de ingreso debe estar entre 2018 y 2025',
+        errors: [{ field: 'año_ingreso', message: 'Año de ingreso fuera del rango válido' }]
+      });
+    }
+
+    // Verificar si el usuario ya existe por email
+    const existingUserByEmail = await User.findOne({ email: email.toLowerCase() });
+    if (existingUserByEmail) {
+      return res.status(409).json({
+        success: false,
+        message: 'Ya existe una cuenta con este email',
+        errors: [{ field: 'email', message: 'Email ya registrado' }]
+      });
+    }
+
+    // Verificar si el usuario ya existe por RUT
+    const existingUserByRut = await User.findOne({ rut: rutLimpio });
+    if (existingUserByRut) {
+      return res.status(409).json({
+        success: false,
+        message: 'Ya existe una cuenta con este RUT',
+        errors: [{ field: 'rut', message: 'RUT ya registrado' }]
+      });
+    }
+
+    // Hashear la contraseña
+    const saltRounds = parseInt(process.env.BCRYPT_SALT_ROUNDS) || 12;
+    const hashedPassword = await bcrypt.hash(password, saltRounds);
+
+    // Generar código de verificación de email
+    const emailVerificationCode = generateVerificationCode();
+    const emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 horas
+
+    // Determinar el rol basado en el tipo de email
+    const role = req.userType || 'student'; // Viene del middleware validateUCNEmail
+
+    // Crear el usuario
+    const newUser = new User({
+      rut: rutLimpio,
+      email: email.toLowerCase(),
+      nombre: nombre.trim(),
+      apellidos: apellidos.trim(),
+      password: hashedPassword,
+      carrera: carreraValida,
+      role: role,
+      año_ingreso: año_ingreso || new Date().getFullYear(),
+      alianza: alianza || null,
+      telefono: telefono?.trim() || null,
+      biografia: biografia?.trim() || null,
+      verificado: false,
+      emailVerificationCode,
+      emailVerificationExpires,
+      accountStatus: 'pending_verification',
+      fecha_registro: new Date(),
+      configuracion: {
+        notificaciones: {
+          email: true,
+          push: true,
+          mensajes: true,
+          publicaciones: true
+        },
+        privacidad: {
+          perfil_publico: true,
+          mostrar_email: false,
+          mostrar_telefono: false
+        }
+      }
+    });
+
+    await newUser.save();
+
+    // TODO: Enviar email de verificación
+    console.log(`Código de verificación para ${email}: ${emailVerificationCode}`);
 
     // Generar tokens
-    const { accessToken, refreshToken } = generateTokens(user._id);
+    const tokens = generateTokens(newUser._id);
 
-    // Log del registro exitoso
-    logAction('USER_REGISTERED', validatedEmail, `Usuario registrado exitosamente - Rol: ${role}`);
-
-    // Respuesta sin datos sensibles
+    // Preparar respuesta del usuario (sin datos sensibles)
     const userResponse = {
-      id: user._id,
-      name: user.name,
-      email: user.email,
-      carrera: user.carrera,
-      año_ingreso: user.año_ingreso,
-      campus: user.campus,
-      foto_perfil: user.foto_perfil,
-      role: user.role,
-      verificado: user.verificado,
-      fecha_registro: user.fecha_registro
+      id: newUser._id,
+      rut: `${newUser.rut.slice(0, -1)}-${newUser.rut.slice(-1)}`,
+      email: newUser.email,
+      nombre: newUser.nombre,
+      apellidos: newUser.apellidos,
+      name: newUser.name,
+      carrera: newUser.carrera,
+      facultad: newUser.facultad,
+      role: newUser.role,
+      año_ingreso: newUser.año_ingreso,
+      campus: newUser.campus,
+      verificado: newUser.verificado,
+      accountStatus: newUser.accountStatus,
+      fecha_registro: newUser.fecha_registro
     };
 
-    res.status(201).json(createResponse(
-      true,
-      'Usuario registrado exitosamente. Verifica tu email para activar la cuenta',
-      {
+    res.status(201).json({
+      success: true,
+      message: 'Usuario registrado exitosamente. Revisa tu email para verificar tu cuenta.',
+      data: {
         user: userResponse,
-        accessToken,
-        refreshToken,
-        tokenExpiry: process.env.JWT_EXPIRE,
-        requiresEmailVerification: !user.verificado
+        ...tokens,
+        requiresEmailVerification: true
       }
-    ));
-
-    // TODO: Enviar email de verificación en segundo plano
+    });
 
   } catch (error) {
     console.error('Error en registro:', error);
-    logAction('REGISTER_ERROR', req.body.email, `Error en registro: ${error.message}`);
     
-    // Manejo específico de errores de validación de Mongoose
+    // Manejar errores de validación de MongoDB
     if (error.name === 'ValidationError') {
       const validationErrors = Object.values(error.errors).map(err => ({
         field: err.path,
-        message: err.message,
-        value: err.value
+        message: err.message
       }));
 
-      return res.status(400).json(createResponse(
-        false,
-        'Error de validación en los datos proporcionados',
-        null,
-        { validationErrors }
-      ));
+      return res.status(400).json({
+        success: false,
+        message: 'Error de validación',
+        errors: validationErrors
+      });
     }
 
-    // Error de duplicado (por si falla la verificación previa)
-    if (error.code === 11000) {
-      return res.status(409).json(createResponse(
-        false,
-        'Ya existe una cuenta con este email institucional'
-      ));
-    }
-
-    res.status(500).json(createResponse(
-      false,
-      'Error interno del servidor durante el registro',
-      null,
-      process.env.NODE_ENV === 'development' ? { error: error.message } : {}
-    ));
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      errors: [{ field: 'server', message: 'Error interno del servidor' }]
+    });
   }
 };
 
+/**
+ * Iniciar sesión
+ * @route POST /api/auth/login
+ */
 const login = async (req, res) => {
-  const clientIP = req.ip || req.connection.remoteAddress;
-  const userAgent = req.get('User-Agent') || 'Unknown';
-  
   try {
-    const { email, password, remember_me = false } = req.body;
+    const { email, password, remember_me } = req.body;
 
-    // Usar email validado del middleware
-    const validatedEmail = req.validatedEmail?.email || email.toLowerCase().trim();
-
-    // Validar que se proporcionen credenciales
-    if (!validatedEmail || !password) {
-      logAction('LOGIN_ATTEMPT_MISSING_CREDENTIALS', validatedEmail || 'unknown', `IP: ${clientIP}`);
-      return res.status(400).json(createResponse(
-        false,
-        'Email y contraseña son requeridos'
-      ));
+    // Validaciones básicas
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email y contraseña son obligatorios',
+        errors: [
+          { field: 'email', message: 'Email requerido' },
+          { field: 'password', message: 'Contraseña requerida' }
+        ]
+      });
     }
 
-    // Buscar usuario incluyendo campos sensibles para autenticación
-    const user = await User.findOne({ email: validatedEmail })
-      .select('+password +login_attempts +account_locked +lock_until +verification_token +last_login');
+    // Buscar usuario por email (incluir password)
+    const user = await User.findOne({ email: email.toLowerCase() }).select('+password +emailVerificationCode');
 
-    // Si no existe el usuario, dar respuesta genérica para evitar enumeración
-    if (!user) {
-      logAction('LOGIN_ATTEMPT_INVALID_EMAIL', validatedEmail, `IP: ${clientIP} - Usuario no existe`);
-      
-      // Agregar delay artificial para prevenir timing attacks
-      await new Promise(resolve => setTimeout(resolve, Math.random() * 1000 + 500));
-      
-      return res.status(401).json(createResponse(
-        false,
-        'Email o contraseña incorrectos',
-        null,
-        { 
-          suggestion: 'Verifica que hayas ingresado correctamente tu email institucional',
-          registerUrl: '/api/auth/register'
-        }
-      ));
-    }
+    // Timing attack protection: siempre hacer el hash comparison
+    const dummyHash = '$2b$12$dummyhashtopreventtimingattacks';
+    const passwordToCompare = user ? user.password : dummyHash;
+    const passwordIsValid = await bcrypt.compare(password, passwordToCompare);
 
-    // Verificar si la cuenta está activa
-    if (!user.isActive) {
-      logAction('LOGIN_ATTEMPT_INACTIVE_ACCOUNT', validatedEmail, `IP: ${clientIP} - Cuenta inactiva`);
-      return res.status(403).json(createResponse(
-        false,
-        'Tu cuenta está desactivada. Contacta al administrador para reactivarla',
-        null,
-        { 
-          accountStatus: 'inactive',
-          contactSupport: true
-        }
-      ));
+    if (!user || !passwordIsValid) {
+      // Incrementar intentos fallidos si el usuario existe
+      if (user) {
+        await user.incrementLoginAttempts();
+      }
+
+      return res.status(401).json({
+        success: false,
+        message: 'Credenciales inválidas',
+        errors: [{ field: 'credentials', message: 'Email o contraseña incorrectos' }]
+      });
     }
 
     // Verificar si la cuenta está bloqueada
     if (user.isAccountLocked()) {
-      const lockTimeRemaining = Math.ceil((user.lock_until - Date.now()) / (1000 * 60)); // minutos
-      logAction('LOGIN_ATTEMPT_LOCKED_ACCOUNT', validatedEmail, `IP: ${clientIP} - Cuenta bloqueada, ${lockTimeRemaining}min restantes`);
-      
-      return res.status(423).json(createResponse(
-        false,
-        `Tu cuenta está temporalmente bloqueada por múltiples intentos fallidos`,
-        null,
-        {
-          accountStatus: 'locked',
-          timeRemaining: `${lockTimeRemaining} minutos`,
-          unlockTime: user.lock_until,
-          reason: 'Demasiados intentos de inicio de sesión fallidos'
-        }
-      ));
+      return res.status(423).json({
+        success: false,
+        message: 'Cuenta bloqueada por múltiples intentos fallidos. Intenta de nuevo más tarde.',
+        errors: [{ field: 'account', message: 'Cuenta temporalmente bloqueada' }]
+      });
     }
 
-    // Verificar contraseña
-    const isMatch = await user.matchPassword(password);
-
-    if (!isMatch) {
-      logAction('LOGIN_ATTEMPT_INVALID_PASSWORD', validatedEmail, `IP: ${clientIP} - Contraseña incorrecta`);
-      
-      // Incrementar intentos fallidos
-      await user.incLoginAttempts();
-      
-      // Verificar cuántos intentos quedan
-      const attemptsRemaining = Math.max(0, 5 - (user.login_attempts + 1));
-      
-      return res.status(401).json(createResponse(
-        false,
-        'Email o contraseña incorrectos',
-        null,
-        {
-          attemptsRemaining,
-          warningMessage: attemptsRemaining <= 2 
-            ? `Quedan ${attemptsRemaining} intentos antes de que tu cuenta se bloquee temporalmente`
-            : undefined,
-          forgotPasswordUrl: '/api/auth/forgot-password'
-        }
-      ));
+    // Verificar estado de la cuenta
+    if (user.accountStatus === 'suspended') {
+      return res.status(403).json({
+        success: false,
+        message: 'Cuenta suspendida. Contacta al administrador.',
+        errors: [{ field: 'account', message: 'Cuenta suspendida' }]
+      });
     }
 
-    // Login exitoso - resetear intentos fallidos
+    if (!user.activo) {
+      return res.status(403).json({
+        success: false,
+        message: 'Cuenta inactiva. Contacta al administrador.',
+        errors: [{ field: 'account', message: 'Cuenta inactiva' }]
+      });
+    }
+
+    // Limpiar intentos fallidos en login exitoso
     await user.resetLoginAttempts();
-
-    // Actualizar último login
+    
     user.last_login = new Date();
+    user.accountStatus = user.verificado ? 'active' : 'pending_verification';
     await user.save();
 
-    // Generar tokens con diferentes duraciones según "remember_me"
-    const tokenExpiry = remember_me ? '30d' : process.env.JWT_EXPIRE || '7d';
-    const { accessToken, refreshToken } = generateTokens(user._id, tokenExpiry);
+    // Generar tokens (más larga duración si remember_me es true)
+    let tokens;
+    if (remember_me) {
+      const payload = { id: user._id };
+      const accessToken = jwt.sign(payload, process.env.JWT_SECRET, { expiresIn: '30d' });
+      const refreshToken = jwt.sign(payload, process.env.JWT_REFRESH_SECRET, { expiresIn: '90d' });
+      const tokenExpiry = new Date();
+      tokenExpiry.setDate(tokenExpiry.getDate() + 30);
+      
+      tokens = { accessToken, refreshToken, tokenExpiry: tokenExpiry.toISOString() };
+    } else {
+      tokens = generateTokens(user._id);
+    }
 
-    // Log del login exitoso
-    logAction('LOGIN_SUCCESS', validatedEmail, `IP: ${clientIP} - UserAgent: ${userAgent} - Remember: ${remember_me}`);
-
-    // Preparar respuesta del usuario sin datos sensibles
+    // Preparar respuesta del usuario
     const userResponse = {
       id: user._id,
-      name: user.name,
+      rut: `${user.rut.slice(0, -1)}-${user.rut.slice(-1)}`,
       email: user.email,
+      nombre: user.nombre,
+      apellidos: user.apellidos,
+      name: user.name,
       carrera: user.carrera,
+      facultad: user.facultad,
+      role: user.role,
       año_ingreso: user.año_ingreso,
       campus: user.campus,
-      foto_perfil: user.foto_perfil,
-      role: user.role,
       verificado: user.verificado,
+      accountStatus: user.accountStatus,
+      foto_perfil: user.foto_perfil,
+      biografia: user.biografia,
+      alianza: user.alianza,
       last_login: user.last_login,
       fecha_registro: user.fecha_registro
     };
 
-    // Verificar si requiere verificación de email
-    if (!user.verificado) {
-      return res.status(200).json(createResponse(
-        true,
-        'Inicio de sesión exitoso, pero tu cuenta requiere verificación por email',
-        {
-          user: userResponse,
-          accessToken,
-          refreshToken,
-          tokenExpiry,
-          requiresEmailVerification: true,
-          verificationSent: false
-        }
-      ));
-    }
-
-    // Respuesta de login exitoso completo
-    res.status(200).json(createResponse(
-      true,
-      'Inicio de sesión exitoso',
-      {
+    res.status(200).json({
+      success: true,
+      message: 'Inicio de sesión exitoso',
+      data: {
         user: userResponse,
-        accessToken,
-        refreshToken,
-        tokenExpiry,
-        sessionInfo: {
-          loginTime: new Date(),
-          rememberMe: remember_me,
-          deviceInfo: {
-            ip: clientIP,
-            userAgent: userAgent
-          }
-        }
+        ...tokens,
+        requiresEmailVerification: !user.verificado
       }
-    ));
+    });
 
   } catch (error) {
     console.error('Error en login:', error);
-    logAction('LOGIN_ERROR', req.body.email || 'unknown', `IP: ${clientIP} - Error: ${error.message}`);
-    
-    res.status(500).json(createResponse(
-      false,
-      'Error interno del servidor durante el inicio de sesión',
-      null,
-      process.env.NODE_ENV === 'development' ? { error: error.message } : {}
-    ));
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      errors: [{ field: 'server', message: 'Error interno del servidor' }]
+    });
   }
 };
 
-const getMe = async (req, res) => {
+/**
+ * Obtener perfil del usuario autenticado
+ * @route GET /api/auth/profile
+ */
+const getProfile = async (req, res) => {
   try {
     const userId = req.user.id;
-    
-    // Obtener información completa del usuario
-    const user = await User.findById(userId)
-      .select('-password -verification_token -reset_password_token')
-      .lean();
+
+    const user = await User.findById(userId);
 
     if (!user) {
-      logAction('GET_PROFILE_USER_NOT_FOUND', userId, 'Usuario no encontrado en token válido');
-      return res.status(404).json(createResponse(
-        false,
-        'Usuario no encontrado. Por favor, inicia sesión nuevamente'
-      ));
+      return res.status(404).json({
+        success: false,
+        message: 'Usuario no encontrado',
+        errors: [{ field: 'user', message: 'Usuario no encontrado' }]
+      });
     }
 
-    // Verificar si la cuenta sigue activa
-    if (!user.isActive) {
-      logAction('GET_PROFILE_INACTIVE_USER', user.email, 'Intento de acceso con cuenta inactiva');
-      return res.status(403).json(createResponse(
-        false,
-        'Tu cuenta está desactivada',
-        null,
-        {
-          accountStatus: 'inactive',
-          requiresLogin: true
-        }
-      ));
-    }
-
-    // Calcular estadísticas adicionales si es necesario
-    const userProfile = {
-      ...user,
-      stats: {
-        memberSince: user.fecha_registro,
-        lastLogin: user.last_login,
-        accountAge: user.tiempo_registro, // Virtual del modelo
-        currentYear: user.año_actual, // Virtual del modelo
-        profileComplete: calculateProfileCompleteness(user)
-      },
-      security: {
-        emailVerified: user.verificado,
-        twoFactorEnabled: false, // Para futuro
-        lastPasswordChange: null, // Para futuro
-        activeSessions: 1 // Para futuro
-      },
-      preferences: {
-        privacy: user.privacy_settings,
-        notifications: {
-          email: true,
-          push: true,
-          inApp: true
-        }
-      }
+    const userResponse = {
+      id: user._id,
+      rut: `${user.rut.slice(0, -1)}-${user.rut.slice(-1)}`,
+      email: user.email,
+      nombre: user.nombre,
+      apellidos: user.apellidos,
+      name: user.name,
+      carrera: user.carrera,
+      facultad: user.facultad,
+      role: user.role,
+      año_ingreso: user.año_ingreso,
+      campus: user.campus,
+      verificado: user.verificado,
+      accountStatus: user.accountStatus,
+      foto_perfil: user.foto_perfil,
+      biografia: user.biografia,
+      telefono: user.telefono,
+      alianza: user.alianza,
+      last_login: user.last_login,
+      fecha_registro: user.fecha_registro,
+      configuracion: user.configuracion,
+      añoAcademico: user.añoAcademico
     };
 
-    // Log del acceso exitoso al perfil
-    logAction('GET_PROFILE_SUCCESS', user.email, `Perfil accedido exitosamente`);
-
-    res.status(200).json(createResponse(
-      true,
-      'Perfil obtenido exitosamente',
-      {
-        user: userProfile
+    res.status(200).json({
+      success: true,
+      message: 'Perfil obtenido exitosamente',
+      data: {
+        user: userResponse
       }
-    ));
+    });
 
   } catch (error) {
     console.error('Error obteniendo perfil:', error);
-    logAction('GET_PROFILE_ERROR', req.user?.id || 'unknown', `Error: ${error.message}`);
-    
-    res.status(500).json(createResponse(
-      false,
-      'Error interno del servidor al obtener el perfil',
-      null,
-      process.env.NODE_ENV === 'development' ? { error: error.message } : {}
-    ));
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      errors: [{ field: 'server', message: 'Error interno del servidor' }]
+    });
   }
 };
 
-// Función helper para calcular completitud del perfil
-const calculateProfileCompleteness = (user) => {
-  let completeness = 0;
-  const fields = [
-    'name',
-    'email',
-    'carrera',
-    'año_ingreso',
-    'campus',
-    'biografia',
-    'foto_perfil'
-  ];
-  
-  fields.forEach(field => {
-    if (user[field] && user[field].toString().trim()) {
-      completeness += 1;
-    }
-  });
-  
-  return {
-    percentage: Math.round((completeness / fields.length) * 100),
-    missingFields: fields.filter(field => 
-      !user[field] || !user[field].toString().trim()
-    ),
-    isComplete: completeness === fields.length
-  };
-};
-
-// Función para logout (invalidar token en el lado del cliente)
-const logout = async (req, res) => {
+/**
+ * Verificar email con código
+ * @route POST /api/auth/verify-email
+ */
+const verifyEmail = async (req, res) => {
   try {
-    const userId = req.user.id;
-    const user = await User.findById(userId);
-    
-    if (user) {
-      logAction('LOGOUT_SUCCESS', user.email, 'Sesión cerrada exitosamente');
+    const { email, code } = req.body;
+
+    if (!email || !code) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email y código son obligatorios',
+        errors: [
+          { field: 'email', message: 'Email requerido' },
+          { field: 'code', message: 'Código de verificación requerido' }
+        ]
+      });
     }
 
-    res.status(200).json(createResponse(
-      true,
-      'Sesión cerrada exitosamente',
-      {
-        loggedOut: true,
-        redirectTo: '/login'
+    const user = await User.findOne({ email: email.toLowerCase() }).select('+emailVerificationCode +emailVerificationExpires');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Usuario no encontrado',
+        errors: [{ field: 'email', message: 'Email no registrado' }]
+      });
+    }
+
+    if (user.verificado) {
+      return res.status(400).json({
+        success: false,
+        message: 'El email ya está verificado',
+        errors: [{ field: 'email', message: 'Email ya verificado' }]
+      });
+    }
+
+    if (!user.emailVerificationCode || user.emailVerificationExpires < new Date()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Código de verificación expirado o inválido',
+        errors: [{ field: 'code', message: 'Código expirado o inválido' }]
+      });
+    }
+
+    if (user.emailVerificationCode !== code) {
+      return res.status(400).json({
+        success: false,
+        message: 'Código de verificación incorrecto',
+        errors: [{ field: 'code', message: 'Código incorrecto' }]
+      });
+    }
+
+    // Verificar email
+    user.verificado = true;
+    user.accountStatus = 'active';
+    user.emailVerificationCode = undefined;
+    user.emailVerificationExpires = undefined;
+    user.fecha_verificacion = new Date();
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: 'Email verificado exitosamente',
+      data: {
+        user: {
+          id: user._id,
+          email: user.email,
+          verificado: user.verificado,
+          accountStatus: user.accountStatus,
+          fecha_verificacion: user.fecha_verificacion
+        }
       }
-    ));
+    });
 
   } catch (error) {
-    console.error('Error en logout:', error);
-    res.status(500).json(createResponse(
-      false,
-      'Error al cerrar sesión',
-      null,
-      { loggedOut: true } // Aún así considerar como logout exitoso
-    ));
+    console.error('Error verificando email:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      errors: [{ field: 'server', message: 'Error interno del servidor' }]
+    });
   }
 };
 
-module.exports = { register, login, getMe, logout };
+/**
+ * Reenviar código de verificación
+ * @route POST /api/auth/resend-verification
+ */
+const resendVerification = async (req, res) => {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({
+        success: false,
+        message: 'Email es obligatorio',
+        errors: [{ field: 'email', message: 'Email requerido' }]
+      });
+    }
+
+    const user = await User.findOne({ email: email.toLowerCase() }).select('+emailVerificationCode +emailVerificationExpires');
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Usuario no encontrado',
+        errors: [{ field: 'email', message: 'Email no registrado' }]
+      });
+    }
+
+    if (user.verificado) {
+      return res.status(400).json({
+        success: false,
+        message: 'El email ya está verificado',
+        errors: [{ field: 'email', message: 'Email ya verificado' }]
+      });
+    }
+
+    // Generar nuevo código
+    const emailVerificationCode = generateVerificationCode();
+    const emailVerificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000);
+
+    user.emailVerificationCode = emailVerificationCode;
+    user.emailVerificationExpires = emailVerificationExpires;
+
+    await user.save();
+
+    // TODO: Enviar email de verificación
+    console.log(`Nuevo código de verificación para ${email}: ${emailVerificationCode}`);
+
+    res.status(200).json({
+      success: true,
+      message: 'Código de verificación reenviado exitosamente',
+      data: {
+        email: user.email,
+        codeExpires: emailVerificationExpires
+      }
+    });
+
+  } catch (error) {
+    console.error('Error reenviando verificación:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      errors: [{ field: 'server', message: 'Error interno del servidor' }]
+    });
+  }
+};
+
+module.exports = {
+  register,
+  login,
+  getProfile,
+  verifyEmail,
+  resendVerification
+};
