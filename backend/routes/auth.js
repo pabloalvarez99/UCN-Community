@@ -115,10 +115,6 @@ const registerValidators = [
     .isInt({ min: 2018, max: 2025 })
     .withMessage('El año de ingreso debe estar entre 2018 y 2025'),
 
-  body('alianza')
-    .optional()
-    .isIn(['Blanca', 'Azul'])
-    .withMessage('La alianza debe ser Blanca o Azul'),
 
   body('telefono')
     .optional()

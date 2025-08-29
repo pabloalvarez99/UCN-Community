@@ -111,7 +111,7 @@ const protect = async (req, res, next) => {
     }
 
     // Verificar que la cuenta esté activa
-    if (!user.isActive) {
+    if (!user.activo) {
       logAction('AUTH_INACTIVE_ACCOUNT', user.email, `IP: ${clientIP} - Intento de acceso con cuenta inactiva`);
       return res.status(403).json(createResponse(
         false,
@@ -150,7 +150,7 @@ const protect = async (req, res, next) => {
       verificado: user.verificado,
       carrera: user.carrera,
       campus: user.campus,
-      isActive: user.isActive
+      activo: user.activo
     };
 
     // Agregar información de la sesión

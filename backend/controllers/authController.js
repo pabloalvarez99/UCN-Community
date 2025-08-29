@@ -61,7 +61,6 @@ const register = async (req, res) => {
       facultad,
       password,
       año_ingreso,
-      alianza,
       telefono,
       biografia
     } = req.body;
@@ -87,18 +86,11 @@ const register = async (req, res) => {
       });
     }
 
-    // Verificar requisitos de contraseña
-    const hasMinLength = password.length >= 8;
-    const hasLowercase = /[a-z]/.test(password);
-    const hasUppercase = /[A-Z]/.test(password);
-    const hasNumber = /\d/.test(password);
-    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
-
-    if (!hasMinLength || !hasLowercase || !hasUppercase || !hasNumber || !hasSpecialChar) {
+    if (password.length < 6) {
       return res.status(400).json({
         success: false,
-        message: 'La contraseña debe tener al menos 8 caracteres, incluyendo: 1 minúscula, 1 mayúscula, 1 número y 1 carácter especial (!@#$%^&*(),.?":{}|<>)',
-        errors: [{ field: 'password', message: 'La contraseña no cumple con los requisitos de seguridad' }]
+        message: 'La contraseña debe tener al menos 6 caracteres',
+        errors: [{ field: 'password', message: 'La contraseña debe tener al menos 6 caracteres' }]
       });
     }
 
@@ -152,7 +144,6 @@ const register = async (req, res) => {
       carrera: carreraValida,
       role: role,
       año_ingreso: año_ingreso || new Date().getFullYear(),
-      alianza: alianza || null,
       telefono: telefono?.trim() || null,
       biografia: biografia?.trim() || null,
       verificado: false,

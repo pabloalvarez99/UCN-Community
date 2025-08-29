@@ -1,7 +1,7 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 
-// Carreras oficiales UCN Campus Coquimbo
+// Carreras oficiales UCN Campus Coquimbo (17 carreras)
 const CARRERAS_UCN_COQUIMBO = [
   'Biología Marina',
   'Ingeniería en Acuicultura', 
@@ -19,8 +19,7 @@ const CARRERAS_UCN_COQUIMBO = [
   'Ingeniería en Información y Control de Gestión',
   'Derecho',
   'Periodismo',
-  'Psicología',
-  'Pedagogía en Filosofía y Religión'
+  'Psicología'
 ];
 
 const userSchema = new mongoose.Schema({
@@ -93,7 +92,7 @@ const userSchema = new mongoose.Schema({
   password: {
     type: String,
     required: [true, 'Contraseña es obligatoria'],
-    minlength: [8, 'La contraseña debe tener al menos 8 caracteres'],
+    minlength: [6, 'La contraseña debe tener al menos 6 caracteres'],
     validate: {
       validator: function(password) {
         // Verificar que tenga al menos:
@@ -102,15 +101,9 @@ const userSchema = new mongoose.Schema({
         // - 1 mayúscula  
         // - 1 número
         // - 1 carácter especial
-        const hasMinLength = password.length >= 8;
-        const hasLowercase = /[a-z]/.test(password);
-        const hasUppercase = /[A-Z]/.test(password);
-        const hasNumber = /\d/.test(password);
-        const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
-        
-        return hasMinLength && hasLowercase && hasUppercase && hasNumber && hasSpecialChar;
+        return password.length >= 6;
       },
-      message: 'La contraseña debe tener al menos 8 caracteres, incluyendo: 1 minúscula, 1 mayúscula, 1 número y 1 carácter especial (!@#$%^&*(),.?":{}|<>)'
+      message: 'La contraseña debe tener al menos 6 caracteres'
     },
     select: false // No incluir en consultas por defecto
   },
@@ -134,14 +127,6 @@ const userSchema = new mongoose.Schema({
     }
   },
 
-  alianza: {
-    type: String,
-    enum: {
-      values: ['Blanca', 'Azul'],
-      message: 'Alianza debe ser Blanca o Azul'
-    },
-    default: null
-  },
 
   biografia: {
     type: String,
@@ -206,8 +191,7 @@ const userSchema = new mongoose.Schema({
         'Ingeniería en Información y Control de Gestión': 'Facultad de Economía y Administración',
         'Derecho': 'Facultad de Derecho',
         'Periodismo': 'Facultad de Humanidades',
-        'Psicología': 'Facultad de Humanidades',
-        'Pedagogía en Filosofía y Religión': 'Facultad de Educación'
+        'Psicología': 'Facultad de Humanidades'
       };
       return facultades[this.carrera] || 'No determinada';
     }
