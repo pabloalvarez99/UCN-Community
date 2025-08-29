@@ -3,32 +3,25 @@
  * Solo permite las 17 carreras oficiales del campus
  */
 
-// Lista oficial de carreras UCN Campus Coquimbo
+// Lista oficial de carreras UCN Campus Coquimbo (17 carreras)
 const CARRERAS_UCN_COQUIMBO = [
-  // Facultad de Ingeniería y Ciencias Geológicas
-  'Ingeniería Civil',
-  'Ingeniería Civil de Minas',
-  'Ingeniería Civil Industrial',
-  'Ingeniería en Sistemas Computacionales',
-  'Ingeniería Comercial',
-  'Geología',
-  
-  // Facultad de Medicina
+  'Biología Marina',
+  'Ingeniería en Acuicultura', 
+  'Ingeniería en Prevención de Riesgos y Medioambiente',
   'Medicina',
   'Enfermería',
+  'Nutrición y Dietética',
   'Kinesiología',
-  'Fonoaudiología',
-  'Tecnología Médica',
-  
-  // Facultad de Humanidades
+  'Ingeniería Civil Industrial',
+  'Ingeniería Civil en Computación e Informática',
+  'Tecnologías de Información',
+  'Ingeniería Comercial',
+  'Contador Auditor Diurno',
+  'Contador Auditor Vespertino', 
+  'Ingeniería en Información y Control de Gestión',
   'Derecho',
-  'Psicología',
-  'Trabajo Social',
   'Periodismo',
-  'Publicidad',
-  
-  // Facultad de Arquitectura y Construcción Civil
-  'Arquitectura'
+  'Psicología'
 ];
 
 /**
@@ -132,23 +125,23 @@ const validateCarreraUCN = (carrera) => {
  */
 const getFacultad = (carrera) => {
   const facultades = {
-    'Ingeniería Civil': 'Facultad de Ingeniería y Ciencias Geológicas',
-    'Ingeniería Civil de Minas': 'Facultad de Ingeniería y Ciencias Geológicas',
-    'Ingeniería Civil Industrial': 'Facultad de Ingeniería y Ciencias Geológicas',
-    'Ingeniería en Sistemas Computacionales': 'Facultad de Ingeniería y Ciencias Geológicas',
-    'Ingeniería Comercial': 'Facultad de Ingeniería y Ciencias Geológicas',
-    'Geología': 'Facultad de Ingeniería y Ciencias Geológicas',
+    'Biología Marina': 'Facultad de Ciencias del Mar',
+    'Ingeniería en Acuicultura': 'Facultad de Ciencias del Mar',
+    'Ingeniería en Prevención de Riesgos y Medioambiente': 'Facultad de Ingeniería y Ciencias Geológicas',
     'Medicina': 'Facultad de Medicina',
     'Enfermería': 'Facultad de Medicina',
+    'Nutrición y Dietética': 'Facultad de Medicina',
     'Kinesiología': 'Facultad de Medicina',
-    'Fonoaudiología': 'Facultad de Medicina',
-    'Tecnología Médica': 'Facultad de Medicina',
-    'Derecho': 'Facultad de Humanidades',
-    'Psicología': 'Facultad de Humanidades',
-    'Trabajo Social': 'Facultad de Humanidades',
+    'Ingeniería Civil Industrial': 'Facultad de Ingeniería y Ciencias Geológicas',
+    'Ingeniería Civil en Computación e Informática': 'Facultad de Ingeniería y Ciencias Geológicas',
+    'Tecnologías de Información': 'Facultad de Ingeniería y Ciencias Geológicas',
+    'Ingeniería Comercial': 'Facultad de Economía y Administración',
+    'Contador Auditor Diurno': 'Facultad de Economía y Administración',
+    'Contador Auditor Vespertino': 'Facultad de Economía y Administración',
+    'Ingeniería en Información y Control de Gestión': 'Facultad de Economía y Administración',
+    'Derecho': 'Facultad de Derecho',
     'Periodismo': 'Facultad de Humanidades',
-    'Publicidad': 'Facultad de Humanidades',
-    'Arquitectura': 'Facultad de Arquitectura y Construcción Civil'
+    'Psicología': 'Facultad de Humanidades'
   };
 
   return facultades[carrera] || 'Facultad no determinada';

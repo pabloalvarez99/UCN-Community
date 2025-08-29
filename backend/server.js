@@ -39,12 +39,14 @@ const testRoutes = require('./routes/test');
 const usersRoutes = require('./routes/users-simple');
 const postsRoutes = require('./routes/posts-simple');
 const chatsRoutes = require('./routes/chats-simple');
+const chatAPIRoutes = require('./routes/chat');
 
 app.use('/api/auth', authRoutes);
 app.use('/api/test', testRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/posts', postsRoutes);
 app.use('/api/chats', chatsRoutes);
+app.use('/api/chat', chatAPIRoutes);
 
 app.get('/', (req, res) => {
   res.json({ 
@@ -59,16 +61,71 @@ app.get('/', (req, res) => {
       'POST /api/auth/login - Iniciar sesión',
       'GET /api/auth/profile - Perfil usuario',
       'GET /api/users - Listar usuarios',
+      'GET /api/users/search/:query - Buscar usuarios para chat',
       'GET /api/test/users - Ver usuarios (test)',
       'GET /api/posts - Ver publicaciones',
-      'GET /api/chats - Ver chats'
+      'GET /api/chats - Ver chats (simple)',
+      'GET /api/chat - Obtener mis chats',
+      'POST /api/chat - Crear nuevo chat',
+      'GET /api/chat/:chatId/messages - Obtener mensajes',
+      'POST /api/chat/:chatId/messages - Enviar mensaje'
     ]
   });
 });
 
-// Socket.IO básico
+// Socket.IO connection handling para chat en tiempo real
 io.on('connection', (socket) => {
   console.log(`✅ Cliente conectado: ${socket.id}`);
+  
+  // Join room para chat
+  socket.on('join_room', (room) => {
+    socket.join(room);
+    console.log(`🏠 Usuario ${socket.id} se unió a la sala: ${room}`);
+    socket.to(room).emit('user_joined', {
+      message: `Usuario se unió al chat`,
+      timestamp: new Date()
+    });
+  });
+
+  // Leave room para chat  
+  socket.on('leave_room', (room) => {
+    socket.leave(room);
+    console.log(`🚪 Usuario ${socket.id} salió de la sala: ${room}`);
+    socket.to(room).emit('user_left', {
+      message: `Usuario salió del chat`,
+      timestamp: new Date()
+    });
+  });
+
+  // Send message para chat
+  socket.on('send_message', (data) => {
+    console.log(`💬 Mensaje en sala ${data.room}:`, data.message);
+    // Reenviar mensaje a todos los usuarios en la sala
+    io.to(data.room).emit('receive_message', {
+      id: Date.now().toString(),
+      message: data.message,
+      sender: data.sender || 'Usuario',
+      room: data.room,
+      timestamp: new Date()
+    });
+  });
+
+  // Typing indicators
+  socket.on('typing_start', (data) => {
+    socket.to(data.room).emit('user_typing', {
+      userId: socket.id,
+      room: data.room,
+      isTyping: true
+    });
+  });
+
+  socket.on('typing_stop', (data) => {
+    socket.to(data.room).emit('user_typing', {
+      userId: socket.id, 
+      room: data.room,
+      isTyping: false
+    });
+  });
   
   socket.on('disconnect', (reason) => {
     console.log(`🔌 Cliente desconectado: ${socket.id} - ${reason}`);

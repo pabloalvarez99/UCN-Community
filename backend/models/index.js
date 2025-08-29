@@ -5,13 +5,19 @@ const Chat = require('./Chat');
 const Message = require('./Message');
 const Notification = require('./Notification');
 
+// Modelos simplificados para Socket.IO chat
+const ChatSimple = require('./ChatSimple');
+const MessageSimple = require('./MessageSimple');
+
 // Configurar referencias de modelo para populate dinámico
 const models = {
   User,
   Post,
   Chat,
   Message,
-  Notification
+  Notification,
+  ChatSimple,
+  MessageSimple
 };
 
 // Función para inicializar todos los modelos

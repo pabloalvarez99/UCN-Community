@@ -10,7 +10,12 @@
       "Bash(npx tailwindcss:*)",
       "Bash(node:*)",
       "Bash(npm start)",
-      "Bash(curl:*)"
+      "Bash(curl:*)",
+      "Bash(time curl:*)",
+      "Bash(echo:*)",
+      "Bash(npm run build:*)",
+      "Bash(taskkill:*)",
+      "Bash(npm run dev:*)"
     ],
     "deny": [],
     "ask": []

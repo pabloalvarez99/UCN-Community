@@ -22,10 +22,10 @@ const {
  * Rate limiting para endpoints de autenticación
  */
 
-// Rate limiting para registro - 3 intentos por hora
+// Rate limiting para registro - 20 intentos por hora (aumentado para desarrollo)
 const registerLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hora
-  max: 3, // Máximo 3 intentos por hora
+  max: 20, // Máximo 20 intentos por hora
   message: {
     success: false,
     message: 'Demasiados intentos de registro. Intenta de nuevo en 1 hora.',
