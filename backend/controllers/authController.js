@@ -78,11 +78,27 @@ const register = async (req, res) => {
       });
     }
 
-    if (!password || password.length < 6) {
+    // Validar contraseña con requisitos de seguridad
+    if (!password) {
       return res.status(400).json({
         success: false,
-        message: 'La contraseña debe tener al menos 6 caracteres',
-        errors: [{ field: 'password', message: 'Contraseña debe tener al menos 6 caracteres' }]
+        message: 'La contraseña es obligatoria',
+        errors: [{ field: 'password', message: 'Contraseña requerida' }]
+      });
+    }
+
+    // Verificar requisitos de contraseña
+    const hasMinLength = password.length >= 8;
+    const hasLowercase = /[a-z]/.test(password);
+    const hasUppercase = /[A-Z]/.test(password);
+    const hasNumber = /\d/.test(password);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+
+    if (!hasMinLength || !hasLowercase || !hasUppercase || !hasNumber || !hasSpecialChar) {
+      return res.status(400).json({
+        success: false,
+        message: 'La contraseña debe tener al menos 8 caracteres, incluyendo: 1 minúscula, 1 mayúscula, 1 número y 1 carácter especial (!@#$%^&*(),.?":{}|<>)',
+        errors: [{ field: 'password', message: 'La contraseña no cumple con los requisitos de seguridad' }]
       });
     }
 

@@ -93,7 +93,25 @@ const userSchema = new mongoose.Schema({
   password: {
     type: String,
     required: [true, 'Contraseña es obligatoria'],
-    minlength: [6, 'La contraseña debe tener al menos 6 caracteres'],
+    minlength: [8, 'La contraseña debe tener al menos 8 caracteres'],
+    validate: {
+      validator: function(password) {
+        // Verificar que tenga al menos:
+        // - 8 caracteres
+        // - 1 minúscula
+        // - 1 mayúscula  
+        // - 1 número
+        // - 1 carácter especial
+        const hasMinLength = password.length >= 8;
+        const hasLowercase = /[a-z]/.test(password);
+        const hasUppercase = /[A-Z]/.test(password);
+        const hasNumber = /\d/.test(password);
+        const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+        
+        return hasMinLength && hasLowercase && hasUppercase && hasNumber && hasSpecialChar;
+      },
+      message: 'La contraseña debe tener al menos 8 caracteres, incluyendo: 1 minúscula, 1 mayúscula, 1 número y 1 carácter especial (!@#$%^&*(),.?":{}|<>)'
+    },
     select: false // No incluir en consultas por defecto
   },
 

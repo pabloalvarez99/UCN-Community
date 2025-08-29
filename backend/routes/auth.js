@@ -7,7 +7,7 @@ const router = express.Router();
 const validateUCNEmail = require('../middleware/validateUCNEmail');
 const { validateRUT } = require('../middleware/validateRUT');
 const { validateCarrera } = require('../middleware/validateCarrera');
-const { requireAuth } = require('../middleware/auth');
+const { protect } = require('../middleware/auth');
 
 // Controladores
 const {
@@ -224,7 +224,7 @@ router.post(
 router.get(
   '/profile',
   profileLimiter,
-  requireAuth,
+  protect,
   getProfile
 );
 
@@ -351,12 +351,10 @@ router.post('/validate-email', [
   });
 });
 
-/**
- * Middleware para logging de rutas de autenticación
- */
-router.use((req, res, next) => {
-  console.log(`[AUTH] ${req.method} ${req.originalUrl} - IP: ${req.ip} - ${new Date().toISOString()}`);
-  next();
-});
+// Middleware de logging comentado temporalmente para debugging
+// router.use((req, res, next) => {
+//   console.log(`[AUTH] ${req.method} ${req.originalUrl} - IP: ${req.ip} - ${new Date().toISOString()}`);
+//   next();
+// });
 
 module.exports = router;

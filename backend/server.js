@@ -70,12 +70,14 @@ const authRoutes = require('./routes/auth');
 const userRoutes = require('./routes/users');
 const postRoutes = require('./routes/posts');
 const chatRoutes = require('./routes/chats');
+const testRoutes = require('./routes/test');
 
 // Configurar rutas de la API
 app.use('/api/auth', authRoutes);
 app.use('/api/users', userRoutes);
 app.use('/api/posts', postRoutes);
 app.use('/api/chats', chatRoutes);
+app.use('/api/test', testRoutes);
 
 app.get('/', (req, res) => {
   res.json({ 
