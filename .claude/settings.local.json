@@ -15,7 +15,22 @@
       "Bash(echo:*)",
       "Bash(npm run build:*)",
       "Bash(taskkill:*)",
-      "Bash(npm run dev:*)"
+      "Bash(npm run dev:*)",
+      "Bash(npm run lint)",
+      "Bash(npm run:*)",
+      "Read(C:\\Users\\Pablo\\Desktop\\Build/**)",
+      "Read(C:\\Users\\Pablo\\Desktop\\Build\\ucn-community-new/**)",
+      "Read(C:\\Users\\Pablo\\Desktop\\Build\\ucn-community-new\\.github/**)",
+      "Read(C:\\Users\\Pablo\\Desktop\\Build\\ucn-community-new\\backend/**)",
+      "Read(C:\\Users\\Pablo\\Desktop\\Build\\ucn-community-new\\backend\\src/**)",
+      "Read(C:\\Users\\Pablo\\Desktop\\Build\\ucn-community-new\\frontend/**)",
+      "Read(C:\\Users\\Pablo\\Desktop\\Build\\ucn-community-new\\frontend\\src/**)",
+      "Bash(chmod:*)",
+      "Read(C:\\Users\\Pablo\\Desktop\\Build\\ucn-community-new\\backend/**)",
+      "Read(C:\\Users\\Pablo\\Desktop\\Build\\ucn-community-new\\frontend/**)",
+      "Read(C:\\Users\\Pablo\\Desktop\\Build\\ucn-community-new/**)",
+      "Bash(find:*)",
+      "Bash(tree:*)"
     ],
     "deny": [],
     "ask": []
