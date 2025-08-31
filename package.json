@@ -1,9 +1,62 @@
 {
-  "dependencies": {
-    "axios": "^1.11.0",
-    "bcryptjs": "^3.0.2",
-    "dotenv": "^17.2.1",
-    "mongoose": "^8.18.0",
-    "socket.io-client": "^4.8.1"
-  }
+  "name": "ucn-community",
+  "version": "1.0.0",
+  "description": "UCN Community Platform - Professional University Social Network",
+  "main": "index.js",
+  "private": true,
+  "workspaces": [
+    "backend",
+    "frontend"
+  ],
+  "scripts": {
+    "dev": "concurrently \"npm run backend:dev\" \"npm run frontend:dev\"",
+    "backend:dev": "cd backend && npm run dev",
+    "frontend:dev": "cd frontend && npm start",
+    "build": "npm run backend:build && npm run frontend:build",
+    "backend:build": "cd backend && npm run build",
+    "frontend:build": "cd frontend && npm run build",
+    "test": "npm run backend:test && npm run frontend:test",
+    "backend:test": "cd backend && npm test",
+    "frontend:test": "cd frontend && npm test",
+    "start": "cd backend && npm start",
+    "install:all": "npm install && cd backend && npm install && cd frontend && npm install",
+    "clean": "rm -rf backend/node_modules frontend/node_modules node_modules",
+    "clean:build": "rm -rf backend/build frontend/build",
+    "clean:all": "npm run clean && npm run clean:build",
+    "lint": "npm run backend:lint && npm run frontend:lint",
+    "backend:lint": "cd backend && npm run lint",
+    "frontend:lint": "cd frontend && npm run lint",
+    "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,md,yml,yaml}\"",
+    "format:check": "prettier --check \"**/*.{js,jsx,ts,tsx,json,md,yml,yaml}\"",
+    "security:audit": "npm audit && cd backend && npm audit && cd frontend && npm audit"
+  },
+  "keywords": [
+    "ucn",
+    "university",
+    "community",
+    "platform",
+    "social-network",
+    "react",
+    "nodejs",
+    "mongodb",
+    "socketio"
+  ],
+  "author": "UCN Community Team",
+  "license": "MIT",
+  "devDependencies": {
+    "concurrently": "^7.6.0",
+    "prettier": "^3.1.1"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ucn-community/platform.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ucn-community/platform/issues"
+  },
+  "homepage": "https://github.com/ucn-community/platform#readme"
 }

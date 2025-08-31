@@ -30,7 +30,8 @@
       "Read(C:\\Users\\Pablo\\Desktop\\Build\\ucn-community-new\\frontend/**)",
       "Read(C:\\Users\\Pablo\\Desktop\\Build\\ucn-community-new/**)",
       "Bash(find:*)",
-      "Bash(tree:*)"
+      "Bash(tree:*)",
+      "Bash(npm ls:*)"
     ],
     "deny": [],
     "ask": []
